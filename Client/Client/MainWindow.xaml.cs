@@ -27,6 +27,8 @@ namespace Client
         static string address = "127.0.0.1";
         static Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         static IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse(address), port);
+        static TcpClient client = null;
+        static NetworkStream stream = null;
 
         public MainWindow()
         {
@@ -39,7 +41,7 @@ namespace Client
         {
             Logs.Clear();
 
-            try
+            /*try
             {
                 socket.Connect(ipPoint);
             }
@@ -67,7 +69,35 @@ namespace Client
                     }
                     catch (Exception ex) { }
                 }
-            });
+            });*/
+
+            try
+            {
+                client = new TcpClient(address, port);
+                stream = client.GetStream();
+                Task.Run(() => 
+                {
+                    while (true)
+                    {
+                        byte[] data = new byte[64];
+                        StringBuilder builder = new StringBuilder();
+                        int bytes = 0;
+
+                        try
+                        {
+                            do
+                            {
+                                bytes = stream.Read(data, 0, data.Length);
+                                builder.Append(Encoding.Unicode.GetString(data));
+                                AddMessageInLogs("[" + DateTime.Now.ToShortTimeString() + "]" + "Ответ сервера: " + builder.ToString());
+                            }
+                            while (stream.DataAvailable);
+                        }
+                        catch (Exception ex) { MessageBox.Show(ex.Message, "Исключение"); Close(); }
+                    }
+                });
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message, "Исключение"); Close(); }
         }
 
         private void AddMessageInLogs(string Message) => Application.Current.Dispatcher.Invoke(() => { Logs.Text += Message + "\n"; });
@@ -78,7 +108,8 @@ namespace Client
             {
                 AddMessageInLogs("Вы были отключены от сервера");
                 //socket.Shutdown(SocketShutdown.Both);
-                socket.Close();
+                //socket.Close();
+                client.Close();
                 Close();
             }
             catch (Exception ex) { }
@@ -93,7 +124,8 @@ namespace Client
                     string query = QueryBox.Text;
                     byte[] data = Encoding.Unicode.GetBytes(QueryBox.Text);
 
-                    socket.SendTo(data, ipPoint);
+                    stream.Write(data, 0, data.Length);
+                    //socket.SendTo(data, ipPoint);
                 }
                 catch (Exception ex) { MessageBox.Show(ex.Message, "Исключение"); }
             }

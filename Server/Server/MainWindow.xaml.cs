@@ -27,6 +27,8 @@ namespace Server
         static Socket listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         static IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), port);
         static EndPoint remotePoint = new IPEndPoint(IPAddress.Any, 0);
+        static TcpListener listener = null;
+        static TcpClient client = null;
 
         public MainWindow()
         {
@@ -42,14 +44,14 @@ namespace Server
             try
             {
                 // связываем сокет с локальной точкой, по которой будем принимать данные
-                listenSocket.Bind(ipPoint);
+                //listenSocket.Bind(ipPoint);
 
                 // начинаем прослушивание
-                listenSocket.Listen(10);
+                //listenSocket.Listen(10);
 
-                AddMessageInLogs("Сервер запущен. Ожидание подключений...");
+                //AddMessageInLogs("Сервер запущен. Ожидание подключений...");
 
-                Task.Run(() =>
+                /*Task.Run(() =>
                 {
                     while (true)
                     {
@@ -73,13 +75,29 @@ namespace Server
                         data = Encoding.Unicode.GetBytes(message);
                         handler.SendTo(data, ipPoint);
                     }
+                });*/
+
+                listener = new TcpListener(IPAddress.Parse("127.0.0.1"), port);
+                listener.Start();
+
+                AddMessageInLogs("Сервер запущен. Ожидание подключений...");
+
+                Task.Run(() => 
+                {
+                    while (true) 
+                    {
+                        client = listener.AcceptTcpClient();
+                        ClientObject clientObject = new ClientObject(client);
+                        Thread clientThread = new Thread(new ThreadStart(clientObject.Process));
+                        clientThread.Start();
+                    }
                 });
             }
             catch (Exception ex) { AddMessageInLogs(ex.Message); }
         }
 
         private void AddMessageInLogsFromClient(string Message) => Application.Current.Dispatcher.Invoke(() => { ClientQuery.Text += "[" + DateTime.Now.ToShortTimeString() + "]" + "Клиент: " + Message + "\n"; });
-        private void AddMessageInLogs(string Message) => Application.Current.Dispatcher.Invoke(() => { ClientQuery.Text += Message + "\n"; });
+        public void AddMessageInLogs(string Message) => Application.Current.Dispatcher.Invoke(() => { ClientQuery.Text += Message + "\n"; });
 
         private void OffServerButtonClick(object sender, RoutedEventArgs e) 
         {
@@ -87,7 +105,9 @@ namespace Server
             {
                 AddMessageInLogs("Сервер остановлен");
                 //listenSocket.Shutdown(SocketShutdown.Both);
-                listenSocket.Close();
+                if (!(ClientObject.client is null)) ClientObject.client.Close();
+                if (!(ClientObject.stream is null)) ClientObject.stream.Close();
+                //listenSocket.Close();
                 Close();
             }
             catch (Exception ex) { }
